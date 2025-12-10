@@ -371,7 +371,7 @@ class ChessClientEnhanced:
         self.opponent_timer = ChessTimer(left_sidebar)
         self.opponent_timer.pack(pady=10)
         
-        # Opponent's captured pieces section (pieces they took from us)
+        # Your Losses section (pieces YOU lost to opponent)
         tk.Label(
             left_sidebar,
             text="💔 Your Losses",
@@ -380,8 +380,16 @@ class ChessClientEnhanced:
             fg=COLORS['danger']
         ).pack(pady=(15, 5))
         
-        # This shows pieces captured BY opponent (our pieces lost)
-        self.opponent_captured = CapturedPieces(left_sidebar, color="opponent")
+        tk.Label(
+            left_sidebar,
+            text="(Pieces opponent took)",
+            font=FONTS['tiny'],
+            bg=COLORS['bg_primary'],
+            fg=COLORS['text_muted']
+        ).pack()
+        
+        # This shows pieces opponent captured FROM you
+        self.opponent_captured = CapturedPieces(left_sidebar, color="losses")
         self.opponent_captured.pack(pady=5, fill=tk.X)
         
         # Center - Chess board
@@ -438,6 +446,14 @@ class ChessClientEnhanced:
             bg=COLORS['bg_primary'],
             fg=COLORS['success']
         ).pack(pady=(10, 5))
+        
+        tk.Label(
+            center_frame,
+            text="(Pieces you took)",
+            font=FONTS['tiny'],
+            bg=COLORS['bg_primary'],
+            fg=COLORS['text_muted']
+        ).pack()
         
         # This shows pieces captured BY me (their pieces lost)
         self.my_captured = CapturedPieces(center_frame, color="player")
