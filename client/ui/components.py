@@ -242,6 +242,11 @@ class CapturedPieces(tk.Frame):
         self.captured.append(piece)
         self._update_display()
     
+    def set_pieces(self, pieces: list):
+        """Set all captured pieces"""
+        self.captured = pieces.copy()
+        self._update_display()
+    
     def _update_display(self):
         """Update pieces display"""
         from ui.styles import PIECES_UNICODE

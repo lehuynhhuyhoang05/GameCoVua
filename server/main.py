@@ -268,14 +268,20 @@ class ChessServer:
         to_square = data.get("to")
         promotion = data.get("promotion")
         
-        if room.game.make_move(from_square, to_square, promotion):
+        move_result = room.game.make_move(from_square, to_square, promotion)
+        if move_result[0]:  # Move was successful
+            captured_piece = move_result[1] if len(move_result) > 1 else None
+            
             # Broadcast move to both players
             move_data = {
                 "from": from_square,
                 "to": to_square,
                 "promotion": promotion,
                 "board_state": room.game.get_board_state(),
-                "current_turn": room.game.get_current_turn()
+                "current_turn": room.game.get_current_turn(),
+                "captured_piece": captured_piece,
+                "captured_by_white": room.game.captured_by_white,
+                "captured_by_black": room.game.captured_by_black
             }
             
             send_message(room.white_player.socket, MSG_MOVE_UPDATE, move_data)
@@ -286,6 +292,7 @@ class ChessServer:
                 result = room.game.get_game_result()
                 self.broadcast_game_over(room, result)
         else:
+            # Send more detailed error
             send_message(client_socket, MSG_ERROR, {"error": "Invalid move"})
     
     def handle_chat(self, player, data):

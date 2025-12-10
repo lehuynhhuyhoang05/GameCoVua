@@ -621,6 +621,7 @@ class ChessClientEnhanced:
         elif msg_type == MSG_MOVE_UPDATE:
             from_sq = data.get("from")
             to_sq = data.get("to")
+            captured_piece = data.get("captured_piece")
             
             self.update_board(data.get("board_state"))
             self.current_turn = data.get("current_turn")
@@ -629,11 +630,24 @@ class ChessClientEnhanced:
             if from_sq and to_sq:
                 self.board_ui.set_last_move(from_sq, to_sq)
             
+            # Update captured pieces display
+            if self.my_captured and self.opponent_captured:
+                captured_by_white = data.get("captured_by_white", [])
+                captured_by_black = data.get("captured_by_black", [])
+                
+                if self.my_color == COLOR_WHITE:
+                    self.my_captured.set_pieces(captured_by_white)
+                    self.opponent_captured.set_pieces(captured_by_black)
+                else:
+                    self.my_captured.set_pieces(captured_by_black)
+                    self.opponent_captured.set_pieces(captured_by_white)
+            
             # Add to move history
             if self.move_history:
                 # Simple notation (could be improved)
                 move_color = COLOR_WHITE if self.current_turn == COLOR_BLACK else COLOR_WHITE
-                self.move_history.add_move(f"{from_sq}-{to_sq}", move_color)
+                capture_symbol = "x" if captured_piece else "-"
+                self.move_history.add_move(f"{from_sq}{capture_symbol}{to_sq}", move_color)
             
             self.update_turn_display()
             

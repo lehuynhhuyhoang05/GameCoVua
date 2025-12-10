@@ -14,11 +14,15 @@ class ChessEngine:
         """Initialize chess board with starting position"""
         self.board = chess.Board()
         self.move_history = []
+        self.captured_by_white = []  # Pieces captured by white
+        self.captured_by_black = []  # Pieces captured by black
         
     def reset(self):
         """Reset board to starting position"""
         self.board.reset()
         self.move_history = []
+        self.captured_by_white = []
+        self.captured_by_black = []
         
     def make_move(self, from_square: str, to_square: str, promotion: str = None) -> bool:
         """
@@ -51,13 +55,27 @@ class ChessEngine:
             
             # Check if move is legal
             if move in self.board.legal_moves:
+                # Check if this is a capture
+                captured_piece = None
+                if self.board.is_capture(move):
+                    # Get the piece at destination
+                    piece_at_dest = self.board.piece_at(to_sq)
+                    if piece_at_dest:
+                        # Convert to FEN notation
+                        captured_piece = piece_at_dest.symbol()
+                        # Add to appropriate capture list
+                        if self.board.turn == chess.WHITE:
+                            self.captured_by_white.append(captured_piece)
+                        else:
+                            self.captured_by_black.append(captured_piece)
+                
                 self.board.push(move)
                 self.move_history.append(move)
-                return True
-            return False
+                return True, captured_piece
+            return False, None
             
         except (ValueError, chess.InvalidMoveError):
-            return False
+            return False, None
     
     def is_valid_move(self, from_square: str, to_square: str) -> bool:
         """Check if a move is legal"""
