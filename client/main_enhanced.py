@@ -215,7 +215,7 @@ class ChessClientEnhanced:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         # Treeview
-        columns = ('Room Name', 'Players', 'Status')
+        columns = ('Room Name', 'Owner', 'Players', 'Status')
         self.rooms_tree = ttk.Treeview(
             tree_frame,
             columns=columns,
@@ -224,9 +224,18 @@ class ChessClientEnhanced:
             yscrollcommand=scrollbar.set
         )
         
-        for col in columns:
-            self.rooms_tree.heading(col, text=col)
-            self.rooms_tree.column(col, width=200)
+        # Set column widths
+        self.rooms_tree.heading('Room Name', text='Room Name')
+        self.rooms_tree.column('Room Name', width=200)
+        
+        self.rooms_tree.heading('Owner', text='Owner')
+        self.rooms_tree.column('Owner', width=120)
+        
+        self.rooms_tree.heading('Players', text='Players')
+        self.rooms_tree.column('Players', width=80)
+        
+        self.rooms_tree.heading('Status', text='Status')
+        self.rooms_tree.column('Status', width=100)
         
         self.rooms_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.rooms_tree.yview)
@@ -318,9 +327,18 @@ class ChessClientEnhanced:
         self.opponent_timer = ChessTimer(left_sidebar)
         self.opponent_timer.pack(pady=10)
         
-        # Opponent captured pieces (shows pieces captured by opponent)
-        self.opponent_captured = CapturedPieces(left_sidebar, color=opponent_color or "white")
-        self.opponent_captured.pack(pady=10)
+        # Opponent's captured pieces section (pieces they took from us)
+        tk.Label(
+            left_sidebar,
+            text="💔 Your Losses",
+            font=FONTS['small_bold'],
+            bg=COLORS['bg_primary'],
+            fg=COLORS['danger']
+        ).pack(pady=(15, 5))
+        
+        # This shows pieces captured BY opponent (our pieces lost)
+        self.opponent_captured = CapturedPieces(left_sidebar, color="opponent")
+        self.opponent_captured.pack(pady=5, fill=tk.X)
         
         # Center - Chess board
         center_frame = tk.Frame(main_container, bg=COLORS['bg_primary'])
@@ -368,9 +386,18 @@ class ChessClientEnhanced:
         self.my_timer = ChessTimer(center_frame)
         self.my_timer.pack(pady=5)
         
-        # My captured pieces
-        self.my_captured = CapturedPieces(center_frame, color=self.my_color or "white")
-        self.my_captured.pack(pady=10)
+        # My captured pieces (shows pieces I captured from opponent)
+        tk.Label(
+            center_frame,
+            text="🏆 Your Captures",
+            font=FONTS['small_bold'],
+            bg=COLORS['bg_primary'],
+            fg=COLORS['success']
+        ).pack(pady=(10, 5))
+        
+        # This shows pieces captured BY me (their pieces lost)
+        self.my_captured = CapturedPieces(center_frame, color="player")
+        self.my_captured.pack(pady=5)
         
         # Right sidebar (Move history + Chat + Controls)
         right_sidebar = tk.Frame(main_container, bg=COLORS['bg_primary'], width=300)
@@ -454,6 +481,22 @@ class ChessClientEnhanced:
             text="🤝 Offer Draw",
             command=self.offer_draw,
             **get_button_style('warning'),
+            width=12
+        ).pack(fill=tk.X, pady=3)
+        
+        tk.Button(
+            control_frame,
+            text="🔄 Request Rematch",
+            command=self.request_rematch,
+            **get_button_style('success'),
+            width=12
+        ).pack(fill=tk.X, pady=3)
+        
+        tk.Button(
+            control_frame,
+            text="⛶ Toggle Fullscreen",
+            command=self.toggle_fullscreen,
+            **get_button_style('dark'),
             width=12
         ).pack(fill=tk.X, pady=3)
         
@@ -557,6 +600,17 @@ class ChessClientEnhanced:
         self.network.send(MSG_OFFER_DRAW, {})
         self.add_chat_message("System", "Draw offer sent to opponent", is_system=True)
     
+    def request_rematch(self):
+        """Request a rematch after game over"""
+        self.add_chat_message("System", "Rematch feature coming soon!", is_system=True)
+    
+    def toggle_fullscreen(self):
+        """Toggle fullscreen mode"""
+        current_state = self.root.attributes('-fullscreen')
+        self.root.attributes('-fullscreen', not current_state)
+        if not current_state:
+            self.add_chat_message("System", "Press ESC to exit fullscreen", is_system=True)
+    
     def leave_game(self):
         """Leave current game"""
         if messagebox.askyesno("Leave Game", "Are you sure you want to leave?"):
@@ -631,14 +685,22 @@ class ChessClientEnhanced:
                 self.board_ui.set_last_move(from_sq, to_sq)
             
             # Update captured pieces display
+            # captured_by_white = pieces white captured (black pieces lost)
+            # captured_by_black = pieces black captured (white pieces lost)
             if self.my_captured and self.opponent_captured:
-                captured_by_white = data.get("captured_by_white", [])
-                captured_by_black = data.get("captured_by_black", [])
+                captured_by_white = data.get("captured_by_white", [])  # Black pieces
+                captured_by_black = data.get("captured_by_black", [])  # White pieces
                 
                 if self.my_color == COLOR_WHITE:
+                    # I am white, so:
+                    # - I captured black pieces (captured_by_white)
+                    # - Opponent captured my white pieces (captured_by_black)
                     self.my_captured.set_pieces(captured_by_white)
                     self.opponent_captured.set_pieces(captured_by_black)
                 else:
+                    # I am black, so:
+                    # - I captured white pieces (captured_by_black)
+                    # - Opponent captured my black pieces (captured_by_white)
                     self.my_captured.set_pieces(captured_by_black)
                     self.opponent_captured.set_pieces(captured_by_white)
             
@@ -689,6 +751,7 @@ class ChessClientEnhanced:
             for room in rooms:
                 self.rooms_tree.insert('', tk.END, values=(
                     room['name'],
+                    room.get('creator', 'Unknown'),
                     f"{room['players']}/2",
                     room['status'].capitalize()
                 ), tags=(room['room_id'],))
@@ -757,6 +820,9 @@ class ChessClientEnhanced:
     def run(self):
         """Run the client application"""
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+        
+        # Bind ESC key to exit fullscreen
+        self.root.bind('<Escape>', lambda e: self.root.attributes('-fullscreen', False))
         
         # Center window
         self.root.update_idletasks()

@@ -202,40 +202,32 @@ class CapturedPieces(tk.Frame):
     
     def __init__(self, parent, color="white"):
         """Initialize captured pieces display"""
-        super().__init__(parent, bg=COLORS['bg_primary'])
+        super().__init__(parent, bg=COLORS['bg_card'], relief='solid', borderwidth=1, padx=10, pady=10)
         
         self.color = color
         self.captured = []
         
-        # Title
-        title_text = f"Captured by {color.capitalize()}"
-        tk.Label(
-            self,
-            text=title_text,
-            font=FONTS['small'],
-            bg=COLORS['bg_primary'],
-            fg=COLORS['text_gray']
-        ).pack()
-        
-        # Pieces display
+        # Pieces display with wrapping
         self.pieces_label = tk.Label(
             self,
-            text="",
-            font=('Arial', 16),
-            bg=COLORS['bg_primary'],
-            fg=COLORS['text_dark']
+            text="No pieces captured yet",
+            font=('Arial Unicode MS', 20),
+            bg=COLORS['bg_card'],
+            fg=COLORS['text_dark'],
+            wraplength=180,
+            justify='center'
         )
-        self.pieces_label.pack()
+        self.pieces_label.pack(pady=5)
         
         # Point advantage
         self.points_label = tk.Label(
             self,
-            text="+0",
-            font=FONTS['small'],
-            bg=COLORS['bg_primary'],
+            text="Material: +0",
+            font=FONTS['body_bold'],
+            bg=COLORS['bg_card'],
             fg=COLORS['success']
         )
-        self.points_label.pack()
+        self.points_label.pack(pady=(5, 0))
     
     def add_piece(self, piece: str):
         """Add captured piece"""
@@ -251,20 +243,28 @@ class CapturedPieces(tk.Frame):
         """Update pieces display"""
         from ui.styles import PIECES_UNICODE
         
+        if not self.captured:
+            self.pieces_label.config(text="No pieces yet", fg=COLORS['text_muted'])
+            self.points_label.config(text="Material: +0", fg=COLORS['text_gray'])
+            return
+        
         # Sort pieces by value
         piece_order = {'q': 5, 'r': 4, 'b': 3, 'n': 2, 'p': 1,
                       'Q': 5, 'R': 4, 'B': 3, 'N': 2, 'P': 1}
         sorted_pieces = sorted(self.captured, key=lambda p: piece_order.get(p, 0), reverse=True)
         
-        # Display pieces
-        piece_text = ' '.join([PIECES_UNICODE.get(p, p) for p in sorted_pieces])
-        self.pieces_label.config(text=piece_text)
+        # Display pieces with spacing
+        piece_text = '  '.join([PIECES_UNICODE.get(p, p) for p in sorted_pieces])
+        self.pieces_label.config(text=piece_text, fg=COLORS['text_dark'])
         
         # Calculate point advantage
         piece_values = {'q': 9, 'r': 5, 'b': 3, 'n': 3, 'p': 1,
                        'Q': 9, 'R': 5, 'B': 3, 'N': 3, 'P': 1}
         points = sum(piece_values.get(p, 0) for p in sorted_pieces)
-        self.points_label.config(text=f"+{points}")
+        
+        # Color based on advantage
+        color = COLORS['success'] if points > 0 else COLORS['text_dark']
+        self.points_label.config(text=f"Material: +{points}", fg=color)
     
     def clear(self):
         """Clear captured pieces"""

@@ -60,6 +60,7 @@ FONTS = {
     'body': ('Segoe UI', 12),
     'body_bold': ('Segoe UI', 12, 'bold'),
     'small': ('Segoe UI', 10),
+    'small_bold': ('Segoe UI', 10, 'bold'),
     'tiny': ('Segoe UI', 9),
     'button': ('Segoe UI', 12, 'bold'),
     'button_large': ('Segoe UI', 14, 'bold'),
