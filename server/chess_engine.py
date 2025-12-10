@@ -90,6 +90,17 @@ class ChessEngine:
         except ValueError:
             return None
     
+    def get_piece_color(self, square: str) -> Optional[str]:
+        """Get color of piece at given square"""
+        try:
+            sq = chess.parse_square(square)
+            piece = self.board.piece_at(sq)
+            if piece:
+                return "white" if piece.color == chess.WHITE else "black"
+            return None
+        except ValueError:
+            return None
+    
     def is_check(self) -> bool:
         """Check if current player is in check"""
         return self.board.is_check()

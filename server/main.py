@@ -93,6 +93,9 @@ class ChessServer:
                     
                 elif msg_type == MSG_MOVE:
                     self.handle_move(client_socket, player, data)
+                
+                elif msg_type == "GET_LEGAL_MOVES":
+                    self.handle_get_legal_moves(client_socket, player, data)
                     
                 elif msg_type == MSG_CHAT:
                     self.handle_chat(player, data)
@@ -215,6 +218,33 @@ class ChessServer:
         })
         
         print(f"🎮 Game started in room {room.room_id}")
+    
+    def handle_get_legal_moves(self, client_socket, player, data):
+        """Handle get legal moves request"""
+        if not player or not player.room_id:
+            send_message(client_socket, MSG_ERROR, {"error": "Not in a game"})
+            return
+        
+        room = self.game_manager.get_room(player.room_id)
+        if not room or not room.game:
+            send_message(client_socket, MSG_ERROR, {"error": "Game not found"})
+            return
+        
+        square = data.get("square")
+        if square:
+            # Check if piece belongs to current player
+            piece_color = room.game.get_piece_color(square)
+            if piece_color == player.color:
+                legal_moves = room.game.get_legal_moves(square)
+                send_message(client_socket, "LEGAL_MOVES", {
+                    "square": square,
+                    "moves": legal_moves
+                })
+            else:
+                send_message(client_socket, "LEGAL_MOVES", {
+                    "square": square,
+                    "moves": []
+                })
     
     def handle_move(self, client_socket, player, data):
         """Handle move request"""

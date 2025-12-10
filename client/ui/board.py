@@ -4,26 +4,32 @@ Chess Board UI using Tkinter
 
 import tkinter as tk
 from tkinter import Canvas
-from typing import Optional, Callable, List
+from typing import Optional, Callable, List, Tuple
+import sys
+import os
+
+# Add parent directory to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from ui.styles import COLORS, FONTS, PIECES_UNICODE
 
 
 # Chess piece Unicode symbols
-PIECES = {
-    'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',  # White
-    'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟'   # Black
-}
+PIECES = PIECES_UNICODE
 
 # Colors
-LIGHT_SQUARE = '#F0D9B5'
-DARK_SQUARE = '#B58863'
-HIGHLIGHT_COLOR = '#FFFF00'
-SELECTED_COLOR = '#00FF00'
+LIGHT_SQUARE = COLORS['light_square']
+DARK_SQUARE = COLORS['dark_square']
+HIGHLIGHT_COLOR = COLORS['legal_move']
+SELECTED_COLOR = COLORS['selected']
+LAST_MOVE_COLOR = COLORS['last_move']
+CHECK_COLOR = COLORS['check']
 
 
 class ChessBoardUI:
     """Chess board visual representation"""
     
-    def __init__(self, parent, size=512, flipped=False):
+    def __init__(self, parent, size=560, flipped=False):
         """
         Initialize chess board
         
@@ -37,16 +43,20 @@ class ChessBoardUI:
         self.square_size = size // 8
         self.flipped = flipped
         
-        self.canvas = Canvas(parent, width=size, height=size, bg='white')
+        self.canvas = Canvas(parent, width=size, height=size, bg='white', highlightthickness=0)
         self.canvas.pack()
         
         self.selected_square: Optional[tuple] = None
         self.highlighted_squares: List[tuple] = []
+        self.last_move: Optional[Tuple[tuple, tuple]] = None
+        self.check_square: Optional[tuple] = None
         self.pieces: dict = {}  # (row, col) -> piece symbol
         
         self.click_callback: Optional[Callable] = None
+        self.hover_square: Optional[tuple] = None
         
         self.canvas.bind('<Button-1>', self._on_click)
+        self.canvas.bind('<Motion>', self._on_hover)
         
         self.draw_board()
     
@@ -65,11 +75,18 @@ class ChessBoardUI:
                 is_light = (row + col) % 2 == 0
                 color = LIGHT_SQUARE if is_light else DARK_SQUARE
                 
-                # Highlight if selected or in legal moves
-                if (row, col) == self.selected_square:
+                # Highlight last move
+                if self.last_move and ((row, col) == self.last_move[0] or (row, col) == self.last_move[1]):
+                    color = LAST_MOVE_COLOR
+                # Highlight if selected
+                elif (row, col) == self.selected_square:
                     color = SELECTED_COLOR
+                # Highlight legal moves
                 elif (row, col) in self.highlighted_squares:
                     color = HIGHLIGHT_COLOR
+                # Highlight check
+                elif (row, col) == self.check_square:
+                    color = CHECK_COLOR
                 
                 self.canvas.create_rectangle(
                     x1, y1, x2, y2,
@@ -86,7 +103,8 @@ class ChessBoardUI:
                 i * self.square_size + self.square_size // 2,
                 self.size - 10,
                 text=file_label,
-                font=('Arial', 10),
+                font=FONTS['board_coord'],
+                fill=COLORS['text_gray'],
                 tags='coords'
             )
             
@@ -96,7 +114,8 @@ class ChessBoardUI:
                 10,
                 i * self.square_size + self.square_size // 2,
                 text=rank_label,
-                font=('Arial', 10),
+                font=FONTS['board_coord'],
+                fill=COLORS['text_gray'],
                 tags='coords'
             )
         
@@ -112,12 +131,41 @@ class ChessBoardUI:
                 y = row * self.square_size + self.square_size // 2
                 
                 symbol = PIECES.get(piece, piece)
+                piece_size = self.square_size // 2 + 10
+                
                 self.canvas.create_text(
                     x, y,
                     text=symbol,
-                    font=('Arial', self.square_size // 2, 'bold'),
+                    font=('Arial', piece_size, 'bold'),
                     tags='piece'
                 )
+    
+    def set_last_move(self, from_square: str, to_square: str):
+        """Highlight the last move made"""
+        self.last_move = (
+            self.square_to_coords(from_square),
+            self.square_to_coords(to_square)
+        )
+        self.draw_board()
+    
+    def set_check_square(self, square: Optional[str]):
+        """Highlight square in check"""
+        if square:
+            self.check_square = self.square_to_coords(square)
+        else:
+            self.check_square = None
+        self.draw_board()
+    
+    def _on_hover(self, event):
+        """Handle mouse hover"""
+        col = event.x // self.square_size
+        row = event.y // self.square_size
+        
+        if 0 <= row < 8 and 0 <= col < 8:
+            self.hover_square = (row, col)
+            # Could add hover effect here
+        else:
+            self.hover_square = None
     
     def set_position(self, fen: str):
         """
