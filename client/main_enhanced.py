@@ -81,6 +81,36 @@ class ChessClientEnhanced:
         )
         subtitle.pack(pady=(0, 30))
         
+        # Server IP input
+        tk.Label(
+            main_frame,
+            text="Server IP:",
+            font=FONTS['body'],
+            bg=COLORS['bg_primary'],
+            fg=COLORS['text_dark']
+        ).pack(anchor='w')
+        
+        server_frame = tk.Frame(main_frame, bg=COLORS['bg_primary'])
+        server_frame.pack(fill=tk.X, pady=(5, 10))
+        
+        self.server_entry = tk.Entry(
+            server_frame,
+            font=FONTS['body'],
+            width=25,
+            relief=tk.SOLID,
+            borderwidth=1
+        )
+        self.server_entry.insert(0, "127.0.0.1")  # Default localhost
+        self.server_entry.pack(side=tk.LEFT, ipady=5)
+        
+        tk.Label(
+            server_frame,
+            text="  (localhost hoặc IP bạn)",
+            font=FONTS['tiny'],
+            bg=COLORS['bg_primary'],
+            fg=COLORS['text_muted']
+        ).pack(side=tk.LEFT)
+        
         # Username input
         tk.Label(
             main_frame,
@@ -88,7 +118,7 @@ class ChessClientEnhanced:
             font=FONTS['body'],
             bg=COLORS['bg_primary'],
             fg=COLORS['text_dark']
-        ).pack(anchor='w')
+        ).pack(anchor='w', pady=(10, 0))
         
         self.username_entry = tk.Entry(
             main_frame,
@@ -125,6 +155,7 @@ class ChessClientEnhanced:
     def login(self):
         """Handle login"""
         username = self.username_entry.get().strip()
+        server_ip = self.server_entry.get().strip()
         
         if not username:
             messagebox.showerror("Error", "Please enter a username")
@@ -134,9 +165,22 @@ class ChessClientEnhanced:
             messagebox.showerror("Error", "Username must be at least 3 characters")
             return
         
+        if not server_ip:
+            messagebox.showerror("Error", "Please enter server IP")
+            return
+        
+        # Update network handler with custom IP
+        self.network.host = server_ip
+        
         # Connect to server
         if not self.network.connect():
-            messagebox.showerror("Error", "Could not connect to server.\nMake sure server is running!")
+            messagebox.showerror("Error", 
+                f"Could not connect to server at {server_ip}:5555\n\n"
+                "Tips:\n"
+                "• Use 127.0.0.1 for localhost\n"
+                "• Use friend's IP for LAN (e.g., 192.168.1.100)\n"
+                "• Make sure server is running!\n"
+                "• Check firewall settings")
             return
         
         # Send login request

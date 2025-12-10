@@ -3,7 +3,7 @@ Constants and configuration for Chess Game
 """
 
 # Server Configuration
-SERVER_HOST = '127.0.0.1'
+SERVER_HOST = '0.0.0.0'  # Listen on all network interfaces (LAN + localhost)
 SERVER_PORT = 5555
 BUFFER_SIZE = 4096
 MAX_CONNECTIONS = 10
