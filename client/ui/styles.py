@@ -41,10 +41,10 @@ COLORS = {
     'bg_dark': '#37474F',
     'bg_darker': '#263238',
     
-    # Shadows & Effects
-    'shadow_sm': '#00000015',
-    'shadow_md': '#00000030',
-    'shadow_lg': '#00000040',
+    # Shadows & Effects (Tkinter doesn't support alpha, use gray tones)
+    'shadow_sm': '#E0E0E0',
+    'shadow_md': '#BDBDBD',
+    'shadow_lg': '#9E9E9E',
     
     # Gradients (as tuples of colors)
     'gradient_primary': ('#1976D2', '#42A5F5'),
@@ -140,17 +140,13 @@ def get_button_style(style='primary', size='normal'):
         'relief': 'flat',
         'cursor': 'hand2',
         'borderwidth': 0,
-        'padx': 20,
-        'pady': 10,
     })
     
     # Adjust font based on size
     if size == 'large':
         btn_style['font'] = FONTS['button_large']
-        btn_style['pady'] = 12
     elif size == 'small':
         btn_style['font'] = FONTS['body']
-        btn_style['pady'] = 6
     else:
         btn_style['font'] = FONTS['button']
     

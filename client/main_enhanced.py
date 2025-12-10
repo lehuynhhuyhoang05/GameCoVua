@@ -14,6 +14,7 @@ from client.network.socket_handler import NetworkHandler
 from client.ui.board import ChessBoardUI
 from client.ui.styles import COLORS, FONTS, get_button_style
 from client.ui.components import ChessTimer, MoveHistory, PlayerInfo, CapturedPieces
+from client.ui.dialogs import PawnPromotionDialog, ConfirmDialog, GameOverDialog
 
 
 class ChessClientEnhanced:
@@ -297,11 +298,11 @@ class ChessClientEnhanced:
         left_sidebar.pack_propagate(False)
         
         # Opponent info
-        opponent_color = COLOR_BLACK if self.my_color == COLOR_WHITE else COLOR_WHITE
+        opponent_color = COLOR_BLACK if self.my_color == COLOR_WHITE else COLOR_WHITE if self.my_color else None
         self.opponent_player_info = PlayerInfo(
             left_sidebar,
             username=self.opponent_name or "Waiting...",
-            color=opponent_color
+            color=opponent_color or "white"
         )
         self.opponent_player_info.pack(fill=tk.X, pady=(0, 10))
         
@@ -317,8 +318,8 @@ class ChessClientEnhanced:
         self.opponent_timer = ChessTimer(left_sidebar)
         self.opponent_timer.pack(pady=10)
         
-        # Opponent captured pieces
-        self.opponent_captured = CapturedPieces(left_sidebar, color=self.my_color)
+        # Opponent captured pieces (shows pieces captured by opponent)
+        self.opponent_captured = CapturedPieces(left_sidebar, color=opponent_color or "white")
         self.opponent_captured.pack(pady=10)
         
         # Center - Chess board
@@ -340,7 +341,7 @@ class ChessClientEnhanced:
         self.status_label.pack(pady=(0, 10))
         
         # Chess board
-        flipped = (self.my_color == COLOR_BLACK)
+        flipped = (self.my_color == COLOR_BLACK) if self.my_color else False
         self.board_ui = ChessBoardUI(center_frame, size=560, flipped=flipped)
         self.board_ui.set_click_callback(self.on_square_click)
         
@@ -351,7 +352,7 @@ class ChessClientEnhanced:
         self.my_player_info = PlayerInfo(
             my_info_frame,
             username=self.username,
-            color=self.my_color
+            color=self.my_color or "white"
         )
         self.my_player_info.pack()
         
@@ -368,7 +369,7 @@ class ChessClientEnhanced:
         self.my_timer.pack(pady=5)
         
         # My captured pieces
-        self.my_captured = CapturedPieces(center_frame, color=self.my_color)
+        self.my_captured = CapturedPieces(center_frame, color=self.my_color or "white")
         self.my_captured.pack(pady=10)
         
         # Right sidebar (Move history + Chat + Controls)
@@ -489,11 +490,28 @@ class ChessClientEnhanced:
             from_square = self.selected_square
             to_square = square
             
+            # Check if this is a pawn promotion
+            promotion = None
+            from_row, from_col = self.board_ui.square_to_coords(from_square)
+            to_row, to_col = self.board_ui.square_to_coords(to_square)
+            
+            piece = self.board_ui.pieces.get((from_row, from_col))
+            if piece and piece.lower() == 'p':
+                # White pawn reaches row 0, black pawn reaches row 7
+                if (self.my_color == 'white' and to_row == 0) or \
+                   (self.my_color == 'black' and to_row == 7):
+                    # Show promotion dialog
+                    dialog = PawnPromotionDialog(self.root, self.my_color)
+                    promotion = dialog.show()
+                    if not promotion:
+                        # User closed dialog without selecting, default to Queen
+                        promotion = 'Q' if self.my_color == 'white' else 'q'
+            
             # Send move to server
             self.network.send(MSG_MOVE, {
                 "from": from_square,
                 "to": to_square,
-                "promotion": None  # TODO: Add promotion dialog
+                "promotion": promotion
             })
             
             # Clear selection
@@ -525,7 +543,13 @@ class ChessClientEnhanced:
     
     def resign(self):
         """Resign from game"""
-        if messagebox.askyesno("Resign", "Are you sure you want to resign?"):
+        dialog = ConfirmDialog(
+            self.root,
+            "Resign Game",
+            "Are you sure you want to resign?\nYou will lose the game.",
+            "warning"
+        )
+        if dialog.show():
             self.network.send(MSG_RESIGN, {})
     
     def offer_draw(self):
@@ -683,30 +707,37 @@ class ChessClientEnhanced:
     def show_game_over(self, result: str, reason: str):
         """Show game over dialog"""
         reason_text = {
-            END_CHECKMATE: "Checkmate",
-            END_RESIGN: "Resignation",
-            END_TIMEOUT: "Time Out",
-            END_STALEMATE: "Stalemate",
-            END_DRAW: "Draw Agreement"
+            END_CHECKMATE: "checkmate",
+            END_RESIGN: "resign",
+            END_TIMEOUT: "timeout",
+            END_STALEMATE: "stalemate",
+            END_DRAW: "draw_agreement"
         }.get(reason, reason)
         
-        if result == f"{self.my_color}_win":
-            message = f"🎉 Congratulations! You Won!\n\nReason: {reason_text}"
-            title = "Victory!"
-        elif result == "draw":
-            message = f"🤝 Game Drawn\n\nReason: {reason_text}"
-            title = "Draw"
-        else:
-            message = f"😞 You Lost\n\nReason: {reason_text}"
-            title = "Defeat"
+        # Update status bar
+        status_texts = {
+            "checkmate": "Checkmate",
+            "resign": "Resignation",
+            "timeout": "Time Out",
+            "stalemate": "Stalemate",
+            "draw_agreement": "Draw Agreement"
+        }
         
         self.status_label.config(
-            text=f"Game Over - {reason_text}",
+            text=f"Game Over - {status_texts.get(reason_text, reason_text)}",
             bg=COLORS['danger'],
             fg=COLORS['text_light']
         )
         
-        if messagebox.showinfo(title, message):
+        # Show beautiful game over dialog
+        dialog = GameOverDialog(self.root, result, reason_text, self.my_color)
+        action = dialog.show()
+        
+        if action == "new_game":
+            # Go back to lobby to start a new game
+            self.setup_lobby_screen()
+        else:
+            # Go back to lobby
             self.setup_lobby_screen()
     
     def run(self):
