@@ -13,7 +13,7 @@ from ui.styles import COLORS, FONTS
 
 
 class ChessTimer(tk.Frame):
-    """Chess game timer widget"""
+    """Chess game timer widget - Enhanced"""
     
     def __init__(self, parent, initial_time=600):
         """
@@ -23,31 +23,34 @@ class ChessTimer(tk.Frame):
             parent: Parent widget
             initial_time: Initial time in seconds (default 10 minutes)
         """
-        super().__init__(parent, bg=COLORS['bg_primary'])
+        super().__init__(parent, bg=COLORS['bg_card'], relief='solid', borderwidth=1, padx=15, pady=10)
         
         self.time_remaining = initial_time
         self.running = False
         self.timer_id = None
         
-        # Timer display
+        # Timer display with gradient-like effect
         self.time_label = tk.Label(
             self,
             text=self._format_time(initial_time),
-            font=('Digital-7', 32, 'bold'),
-            bg=COLORS['bg_primary'],
+            font=FONTS['timer'],
+            bg=COLORS['bg_card'],
             fg=COLORS['text_dark']
         )
         self.time_label.pack(pady=5)
         
-        # Status indicator
+        # Status indicator with icons
         self.status_label = tk.Label(
             self,
-            text="⏸ Paused",
+            text="⏸ Ready",
             font=FONTS['small'],
-            bg=COLORS['bg_primary'],
-            fg=COLORS['text_gray']
+            bg=COLORS['bg_card'],
+            fg=COLORS['text_muted']
         )
         self.status_label.pack()
+        
+        # Progress indicator (optional visual)
+        self.initial_time = initial_time
     
     def _format_time(self, seconds):
         """Format seconds as MM:SS"""
@@ -56,34 +59,53 @@ class ChessTimer(tk.Frame):
         return f"{minutes:02d}:{secs:02d}"
     
     def start(self):
-        """Start timer"""
+        """Start timer with visual feedback"""
         if not self.running:
             self.running = True
-            self.status_label.config(text="▶ Running", fg=COLORS['success'])
+            self.status_label.config(
+                text="▶ Running",
+                fg=COLORS['success']
+            )
+            self.config(bg=COLORS['bg_card'], borderwidth=2)
             self._tick()
     
     def pause(self):
         """Pause timer"""
         self.running = False
-        self.status_label.config(text="⏸ Paused", fg=COLORS['text_gray'])
+        self.status_label.config(
+            text="⏸ Paused",
+            fg=COLORS['text_muted']
+        )
+        self.config(borderwidth=1)
         if self.timer_id:
             self.after_cancel(self.timer_id)
     
     def _tick(self):
-        """Timer tick"""
+        """Timer tick with color transitions"""
         if self.running and self.time_remaining > 0:
             self.time_remaining -= 1
             self.time_label.config(text=self._format_time(self.time_remaining))
             
-            # Change color when time is low
-            if self.time_remaining <= 30:
+            # Dynamic color changes based on time
+            if self.time_remaining <= 10:
+                # Critical - blinking effect
                 self.time_label.config(fg=COLORS['danger'])
+                self.config(bg='#FFE5E5')
+            elif self.time_remaining <= 30:
+                self.time_label.config(fg=COLORS['danger'])
+                self.config(bg=COLORS['bg_card'])
             elif self.time_remaining <= 60:
                 self.time_label.config(fg=COLORS['warning'])
+            else:
+                self.time_label.config(fg=COLORS['text_dark'])
             
             self.timer_id = self.after(1000, self._tick)
         elif self.time_remaining == 0:
-            self.status_label.config(text="⏰ Time's Up!", fg=COLORS['danger'])
+            self.status_label.config(
+                text="⏰ Time's Up!",
+                fg=COLORS['danger']
+            )
+            self.config(bg='#FFE5E5')
     
     def reset(self, time=600):
         """Reset timer"""
@@ -96,40 +118,55 @@ class ChessTimer(tk.Frame):
 
 
 class MoveHistory(tk.Frame):
-    """Move history display widget"""
+    """Move history display widget - Enhanced"""
     
     def __init__(self, parent):
         """Initialize move history"""
-        super().__init__(parent, bg=COLORS['bg_primary'])
+        super().__init__(parent, bg=COLORS['bg_card'], relief='solid', borderwidth=1)
         
-        # Title
+        # Title with icon
+        title_frame = tk.Frame(self, bg=COLORS['bg_card'])
+        title_frame.pack(fill=tk.X, padx=10, pady=8)
+        
         tk.Label(
-            self,
-            text="📜 Move History",
+            title_frame,
+            text="📜",
+            font=('Segoe UI', 16),
+            bg=COLORS['bg_card']
+        ).pack(side=tk.LEFT, padx=5)
+        
+        tk.Label(
+            title_frame,
+            text="Move History",
             font=FONTS['subheading'],
-            bg=COLORS['bg_primary'],
+            bg=COLORS['bg_card'],
             fg=COLORS['text_dark']
-        ).pack(pady=5)
+        ).pack(side=tk.LEFT)
+        
+        # Separator
+        sep_frame = tk.Frame(self, bg=COLORS['bg_secondary'], height=1)
+        sep_frame.pack(fill=tk.X)
         
         # Scrollbar and Listbox
-        scroll_frame = tk.Frame(self, bg=COLORS['bg_primary'])
-        scroll_frame.pack(fill=tk.BOTH, expand=True)
+        scroll_frame = tk.Frame(self, bg=COLORS['bg_card'])
+        scroll_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         scrollbar = tk.Scrollbar(scroll_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         self.move_list = tk.Listbox(
             scroll_frame,
-            font=('Courier New', 10),
+            font=('Consolas', 11),
             bg=COLORS['bg_secondary'],
             fg=COLORS['text_dark'],
             selectbackground=COLORS['primary'],
             selectforeground=COLORS['text_light'],
             yscrollcommand=scrollbar.set,
-            height=15,
-            width=20,
+            height=12,
+            width=18,
             relief=tk.FLAT,
-            borderwidth=0
+            borderwidth=0,
+            highlightthickness=0
         )
         self.move_list.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.move_list.yview)
@@ -231,65 +268,120 @@ class CapturedPieces(tk.Frame):
 
 
 class PlayerInfo(tk.Frame):
-    """Player information display"""
+    """Player information display - Enhanced with active state animation"""
     
     def __init__(self, parent, username="Player", color="white", rating=1200):
         """Initialize player info"""
-        super().__init__(parent, bg=COLORS['bg_secondary'], relief=tk.SOLID, borderwidth=1)
+        super().__init__(
+            parent,
+            bg=COLORS['bg_card'],
+            relief='solid',
+            borderwidth=2,
+            padx=12,
+            pady=10
+        )
         
         self.username = username
         self.color = color
         self.rating = rating
+        self.is_active = False
         
         # Container
-        container = tk.Frame(self, bg=COLORS['bg_secondary'])
-        container.pack(padx=10, pady=8, fill=tk.BOTH, expand=True)
+        container = tk.Frame(self, bg=COLORS['bg_card'])
+        container.pack(fill=tk.BOTH, expand=True)
         
-        # Color indicator
-        color_symbol = "⚪" if color == "white" else "⚫"
+        # Color indicator with better styling
+        color_bg = COLORS['bg_card']
+        if color == "white":
+            color_symbol = "⚪"
+            color_text = "White"
+        else:
+            color_symbol = "⚫"
+            color_text = "Black"
+        
+        color_frame = tk.Frame(container, bg=color_bg, width=50)
+        color_frame.pack(side=tk.LEFT, padx=(0, 10))
+        color_frame.pack_propagate(False)
+        
         self.color_label = tk.Label(
-            container,
+            color_frame,
             text=color_symbol,
-            font=('Arial', 20),
-            bg=COLORS['bg_secondary']
+            font=('Segoe UI', 24),
+            bg=color_bg
         )
-        self.color_label.pack(side=tk.LEFT, padx=5)
+        self.color_label.pack(expand=True)
         
-        # Info
-        info_frame = tk.Frame(container, bg=COLORS['bg_secondary'])
+        # Info section
+        info_frame = tk.Frame(container, bg=COLORS['bg_card'])
         info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
+        # Username
         self.username_label = tk.Label(
             info_frame,
             text=username,
             font=FONTS['subheading'],
-            bg=COLORS['bg_secondary'],
+            bg=COLORS['bg_card'],
             fg=COLORS['text_dark'],
             anchor='w'
         )
-        self.username_label.pack(anchor='w')
+        self.username_label.pack(anchor='w', fill=tk.X)
+        
+        # Color and rating in one line
+        details_frame = tk.Frame(info_frame, bg=COLORS['bg_card'])
+        details_frame.pack(anchor='w', fill=tk.X)
+        
+        tk.Label(
+            details_frame,
+            text=f"{color_text} • ",
+            font=FONTS['small'],
+            bg=COLORS['bg_card'],
+            fg=COLORS['text_muted']
+        ).pack(side=tk.LEFT)
         
         self.rating_label = tk.Label(
-            info_frame,
-            text=f"Rating: {rating}",
+            details_frame,
+            text=f"⭐ {rating}",
             font=FONTS['small'],
-            bg=COLORS['bg_secondary'],
-            fg=COLORS['text_gray'],
-            anchor='w'
+            bg=COLORS['bg_card'],
+            fg=COLORS['warning']
         )
-        self.rating_label.pack(anchor='w')
+        self.rating_label.pack(side=tk.LEFT)
     
     def set_active(self, active=True):
-        """Set player as active (their turn)"""
+        """Set player as active (their turn) with animated border"""
+        self.is_active = active
+        
         if active:
-            self.config(bg=COLORS['success'], borderwidth=2)
+            # Active state - glowing effect
+            self.config(
+                bg='#E8F5E9',  # Light green background
+                borderwidth=3,
+                relief='solid'
+            )
+            
+            # Update all child backgrounds
             for widget in self.winfo_children():
-                widget.config(bg=COLORS['success'])
-                for child in widget.winfo_children():
-                    child.config(bg=COLORS['success'])
+                if isinstance(widget, (tk.Frame, tk.Label)):
+                    widget.config(bg='#E8F5E9')
+                    for child in widget.winfo_children():
+                        if isinstance(child, (tk.Frame, tk.Label)):
+                            child.config(bg='#E8F5E9')
+            
+            # Add glow effect via border color (simulated)
+            self.config(highlightbackground=COLORS['success'], highlightthickness=2)
         else:
-            self.config(bg=COLORS['bg_secondary'], borderwidth=1)
+            # Inactive state
+            self.config(
+                bg=COLORS['bg_card'],
+                borderwidth=2,
+                relief='solid',
+                highlightthickness=0
+            )
+            
+            # Restore backgrounds
             for widget in self.winfo_children():
-                widget.config(bg=COLORS['bg_secondary'])
-                for child in widget.winfo_children():
-                    child.config(bg=COLORS['bg_secondary'])
+                if isinstance(widget, (tk.Frame, tk.Label)):
+                    widget.config(bg=COLORS['bg_card'])
+                    for child in widget.winfo_children():
+                        if isinstance(child, (tk.Frame, tk.Label)):
+                            child.config(bg=COLORS['bg_card'])

@@ -27,9 +27,9 @@ CHECK_COLOR = COLORS['check']
 
 
 class ChessBoardUI:
-    """Chess board visual representation"""
+    """Chess board visual representation with enhanced effects"""
     
-    def __init__(self, parent, size=560, flipped=False):
+    def __init__(self, parent, size=600, flipped=False):
         """
         Initialize chess board
         
@@ -43,7 +43,18 @@ class ChessBoardUI:
         self.square_size = size // 8
         self.flipped = flipped
         
-        self.canvas = Canvas(parent, width=size, height=size, bg='white', highlightthickness=0)
+        # Create frame with shadow effect
+        board_frame = tk.Frame(parent, bg=COLORS['shadow_md'], padx=2, pady=2)
+        board_frame.pack()
+        
+        self.canvas = Canvas(
+            board_frame,
+            width=size,
+            height=size,
+            bg='white',
+            highlightthickness=0,
+            relief='flat'
+        )
         self.canvas.pack()
         
         self.selected_square: Optional[tuple] = None
@@ -55,13 +66,20 @@ class ChessBoardUI:
         self.click_callback: Optional[Callable] = None
         self.hover_square: Optional[tuple] = None
         
+        # Animation state
+        self.animating = False
+        self.animation_piece = None
+        self.animation_from = None
+        self.animation_to = None
+        
         self.canvas.bind('<Button-1>', self._on_click)
         self.canvas.bind('<Motion>', self._on_hover)
+        self.canvas.bind('<Leave>', self._on_leave)
         
         self.draw_board()
     
     def draw_board(self):
-        """Draw the chess board squares"""
+        """Draw the chess board squares with enhanced visuals"""
         self.canvas.delete('all')
         
         for row in range(8):
@@ -75,55 +93,116 @@ class ChessBoardUI:
                 is_light = (row + col) % 2 == 0
                 color = LIGHT_SQUARE if is_light else DARK_SQUARE
                 
-                # Highlight last move
-                if self.last_move and ((row, col) == self.last_move[0] or (row, col) == self.last_move[1]):
-                    color = LAST_MOVE_COLOR
-                # Highlight if selected
+                # Apply effects based on state
+                # Priority: Check > Selected > Last Move > Legal Move > Hover
+                if (row, col) == self.check_square:
+                    color = CHECK_COLOR
                 elif (row, col) == self.selected_square:
                     color = SELECTED_COLOR
-                # Highlight legal moves
+                elif self.last_move and ((row, col) == self.last_move[0] or (row, col) == self.last_move[1]):
+                    color = LAST_MOVE_COLOR
                 elif (row, col) in self.highlighted_squares:
                     color = HIGHLIGHT_COLOR
-                # Highlight check
-                elif (row, col) == self.check_square:
-                    color = CHECK_COLOR
+                elif (row, col) == self.hover_square and not self.selected_square:
+                    # Slight hover effect
+                    if is_light:
+                        color = '#F5F5DC'  # Slightly darker light square
+                    else:
+                        color = '#6B8E4B'  # Slightly lighter dark square
                 
+                # Draw square
                 self.canvas.create_rectangle(
                     x1, y1, x2, y2,
                     fill=color,
                     outline='',
                     tags='square'
                 )
+                
+                # Draw legal move indicators (circles)
+                if (row, col) in self.highlighted_squares:
+                    piece_here = self.pieces.get((row, col))
+                    center_x = x1 + self.square_size // 2
+                    center_y = y1 + self.square_size // 2
+                    
+                    if piece_here:
+                        # Capture indicator - ring around square
+                        ring_margin = 5
+                        self.canvas.create_rectangle(
+                            x1 + ring_margin, y1 + ring_margin,
+                            x2 - ring_margin, y2 - ring_margin,
+                            outline='#40C4FF',
+                            width=3,
+                            tags='indicator'
+                        )
+                    else:
+                        # Move indicator - dot in center
+                        dot_radius = self.square_size // 8
+                        self.canvas.create_oval(
+                            center_x - dot_radius, center_y - dot_radius,
+                            center_x + dot_radius, center_y + dot_radius,
+                            fill='#40C4FF',
+                            outline='',
+                            tags='indicator'
+                        )
         
-        # Draw coordinates
+        # Draw border
+        self.canvas.create_rectangle(
+            0, 0, self.size, self.size,
+            outline=COLORS['dark'],
+            width=2,
+            tags='border'
+        )
+        
+        # Draw coordinates with better styling
         for i in range(8):
             # Files (a-h)
             file_label = chr(ord('a') + i) if not self.flipped else chr(ord('h') - i)
+            x_pos = i * self.square_size + self.square_size // 2
+            
+            # Top
             self.canvas.create_text(
-                i * self.square_size + self.square_size // 2,
-                self.size - 10,
+                x_pos, 10,
                 text=file_label,
                 font=FONTS['board_coord'],
-                fill=COLORS['text_gray'],
+                fill=COLORS['text_dark'],
+                tags='coords'
+            )
+            # Bottom
+            self.canvas.create_text(
+                x_pos, self.size - 10,
+                text=file_label,
+                font=FONTS['board_coord'],
+                fill=COLORS['text_dark'],
                 tags='coords'
             )
             
             # Ranks (1-8)
             rank_label = str(8 - i) if not self.flipped else str(i + 1)
+            y_pos = i * self.square_size + self.square_size // 2
+            
+            # Left
             self.canvas.create_text(
-                10,
-                i * self.square_size + self.square_size // 2,
+                10, y_pos,
                 text=rank_label,
                 font=FONTS['board_coord'],
-                fill=COLORS['text_gray'],
+                fill=COLORS['text_dark'],
+                tags='coords'
+            )
+            # Right
+            self.canvas.create_text(
+                self.size - 10, y_pos,
+                text=rank_label,
+                font=FONTS['board_coord'],
+                fill=COLORS['text_dark'],
                 tags='coords'
             )
         
         self.draw_pieces()
     
     def draw_pieces(self):
-        """Draw chess pieces on the board"""
+        """Draw chess pieces on the board with shadows"""
         self.canvas.delete('piece')
+        self.canvas.delete('piece_shadow')
         
         for (row, col), piece in self.pieces.items():
             if piece:
@@ -131,14 +210,35 @@ class ChessBoardUI:
                 y = row * self.square_size + self.square_size // 2
                 
                 symbol = PIECES.get(piece, piece)
-                piece_size = self.square_size // 2 + 10
+                piece_size = self.square_size // 2 + 15
+                
+                # Draw shadow for depth effect
+                shadow_offset = 2
+                self.canvas.create_text(
+                    x + shadow_offset, y + shadow_offset,
+                    text=symbol,
+                    font=('Arial Unicode MS', piece_size, 'bold'),
+                    fill=COLORS['shadow_md'],
+                    tags='piece_shadow'
+                )
+                
+                # Draw piece
+                # White pieces - lighter, black pieces - darker
+                piece_color = COLORS['text_light'] if piece.isupper() else COLORS['text_dark']
                 
                 self.canvas.create_text(
                     x, y,
                     text=symbol,
-                    font=('Arial', piece_size, 'bold'),
+                    font=('Arial Unicode MS', piece_size, 'bold'),
+                    fill=piece_color,
                     tags='piece'
                 )
+    
+    def _on_leave(self, event):
+        """Handle mouse leaving canvas"""
+        if self.hover_square:
+            self.hover_square = None
+            self.draw_board()
     
     def set_last_move(self, from_square: str, to_square: str):
         """Highlight the last move made"""
@@ -157,15 +257,25 @@ class ChessBoardUI:
         self.draw_board()
     
     def _on_hover(self, event):
-        """Handle mouse hover"""
+        """Handle mouse hover with visual feedback"""
         col = event.x // self.square_size
         row = event.y // self.square_size
         
         if 0 <= row < 8 and 0 <= col < 8:
-            self.hover_square = (row, col)
-            # Could add hover effect here
+            if self.hover_square != (row, col):
+                self.hover_square = (row, col)
+                self.draw_board()
+                # Change cursor if there's a piece
+                piece = self.pieces.get((row, col))
+                if piece:
+                    self.canvas.config(cursor='hand2')
+                else:
+                    self.canvas.config(cursor='')
         else:
-            self.hover_square = None
+            if self.hover_square is not None:
+                self.hover_square = None
+                self.canvas.config(cursor='')
+                self.draw_board()
     
     def set_position(self, fen: str):
         """
