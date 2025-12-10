@@ -372,13 +372,37 @@ class ChessClientEnhanced:
         self.opponent_timer.pack(pady=10)
         
         # Your Losses section (pieces YOU lost to opponent)
+        # Your Captures section (pieces you took from opponent)
+        tk.Label(
+            left_sidebar,
+            text="🏆 Your Captures",
+            font=FONTS['small_bold'],
+            bg=COLORS['bg_primary'],
+            fg=COLORS['success']
+        ).pack(pady=(15, 5))
+        
+        tk.Label(
+            left_sidebar,
+            text="(Pieces you took)",
+            font=FONTS['tiny'],
+            bg=COLORS['bg_primary'],
+            fg=COLORS['text_muted']
+        ).pack()
+        
+        self.my_captured = CapturedPieces(left_sidebar, color="player")
+        self.my_captured.pack(pady=5, fill=tk.X)
+        
+        # Separator
+        tk.Frame(left_sidebar, height=2, bg=COLORS['text_muted']).pack(fill=tk.X, pady=15)
+        
+        # Your Losses section (pieces opponent took from you)
         tk.Label(
             left_sidebar,
             text="💔 Your Losses",
             font=FONTS['small_bold'],
             bg=COLORS['bg_primary'],
             fg=COLORS['danger']
-        ).pack(pady=(15, 5))
+        ).pack(pady=(5, 5))
         
         tk.Label(
             left_sidebar,
@@ -388,7 +412,6 @@ class ChessClientEnhanced:
             fg=COLORS['text_muted']
         ).pack()
         
-        # This shows pieces opponent captured FROM you
         self.opponent_captured = CapturedPieces(left_sidebar, color="losses")
         self.opponent_captured.pack(pady=5, fill=tk.X)
         
@@ -527,6 +550,30 @@ class ChessClientEnhanced:
         
         control_frame = tk.Frame(right_sidebar, bg=COLORS['bg_primary'])
         control_frame.pack(fill=tk.X)
+        
+        # Undo/Redo buttons in a row
+        undo_redo_frame = tk.Frame(control_frame, bg=COLORS['bg_primary'])
+        undo_redo_frame.pack(fill=tk.X, pady=3)
+        
+        self.undo_btn = tk.Button(
+            undo_redo_frame,
+            text="↶ Undo",
+            command=self.undo_move,
+            **get_button_style('secondary'),
+            width=6,
+            state=tk.DISABLED
+        )
+        self.undo_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 2))
+        
+        self.redo_btn = tk.Button(
+            undo_redo_frame,
+            text="↷ Redo",
+            command=self.redo_move,
+            **get_button_style('secondary'),
+            width=6,
+            state=tk.DISABLED
+        )
+        self.redo_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2, 0))
         
         tk.Button(
             control_frame,
@@ -677,6 +724,16 @@ class ChessClientEnhanced:
             self.network.send(MSG_LEAVE_ROOM, {})
             self.setup_lobby_screen()
     
+    def undo_move(self):
+        """Request undo last move"""
+        if self.network:
+            self.network.send(MSG_UNDO, {})
+    
+    def redo_move(self):
+        """Request redo last undone move"""
+        if self.network:
+            self.network.send(MSG_REDO, {})
+    
     def handle_message(self, message: dict):
         """Handle incoming message from server"""
         msg_type = message.get("type")
@@ -748,28 +805,37 @@ class ChessClientEnhanced:
             # captured_by_white = pieces white captured (black pieces lost)
             # captured_by_black = pieces black captured (white pieces lost)
             if self.my_captured and self.opponent_captured:
-                captured_by_white = data.get("captured_by_white", [])  # Black pieces
-                captured_by_black = data.get("captured_by_black", [])  # White pieces
+                captured_by_white = data.get("captured_by_white", [])  # Black pieces white captured
+                captured_by_black = data.get("captured_by_black", [])  # White pieces black captured
                 
                 if self.my_color == COLOR_WHITE:
-                    # I am white, so:
-                    # - I captured black pieces (captured_by_white)
-                    # - Opponent captured my white pieces (captured_by_black)
-                    self.my_captured.set_pieces(captured_by_white)
-                    self.opponent_captured.set_pieces(captured_by_black)
+                    # I am WHITE:
+                    # - "Your Captures" shows BLACK pieces I captured → captured_by_white
+                    # - "Your Losses" shows WHITE pieces opponent captured → captured_by_black
+                    self.my_captured.set_pieces(captured_by_white)      # Black pieces
+                    self.opponent_captured.set_pieces(captured_by_black)  # White pieces
                 else:
-                    # I am black, so:
-                    # - I captured white pieces (captured_by_black)
-                    # - Opponent captured my black pieces (captured_by_white)
-                    self.my_captured.set_pieces(captured_by_black)
-                    self.opponent_captured.set_pieces(captured_by_white)
+                    # I am BLACK:
+                    # - "Your Captures" shows WHITE pieces I captured → captured_by_black
+                    # - "Your Losses" shows BLACK pieces opponent captured → captured_by_white
+                    self.my_captured.set_pieces(captured_by_black)      # White pieces
+                    self.opponent_captured.set_pieces(captured_by_white)  # Black pieces
             
             # Add to move history
-            if self.move_history:
+            if self.move_history and from_sq and to_sq:
                 # Simple notation (could be improved)
                 move_color = COLOR_WHITE if self.current_turn == COLOR_BLACK else COLOR_WHITE
                 capture_symbol = "x" if captured_piece else "-"
                 self.move_history.add_move(f"{from_sq}{capture_symbol}{to_sq}", move_color)
+            
+            # Update undo/redo button states
+            can_undo = data.get("can_undo", False)
+            can_redo = data.get("can_redo", False)
+            
+            if hasattr(self, 'undo_btn'):
+                self.undo_btn.config(state=tk.NORMAL if can_undo else tk.DISABLED)
+            if hasattr(self, 'redo_btn'):
+                self.redo_btn.config(state=tk.NORMAL if can_redo else tk.DISABLED)
             
             self.update_turn_display()
             

@@ -100,6 +100,12 @@ class ChessServer:
                 elif msg_type == MSG_CHAT:
                     self.handle_chat(player, data)
                     
+                elif msg_type == MSG_UNDO:
+                    self.handle_undo(client_socket, player)
+                    
+                elif msg_type == MSG_REDO:
+                    self.handle_redo(client_socket, player)
+                    
                 elif msg_type == MSG_RESIGN:
                     self.handle_resign(player)
                     
@@ -281,7 +287,9 @@ class ChessServer:
                 "current_turn": room.game.get_current_turn(),
                 "captured_piece": captured_piece,
                 "captured_by_white": room.game.captured_by_white,
-                "captured_by_black": room.game.captured_by_black
+                "captured_by_black": room.game.captured_by_black,
+                "can_undo": room.game.can_undo(),
+                "can_redo": room.game.can_redo()
             }
             
             send_message(room.white_player.socket, MSG_MOVE_UPDATE, move_data)
@@ -313,6 +321,60 @@ class ChessServer:
         # Broadcast to both players
         for p in room.players:
             send_message(p.socket, MSG_CHAT_MESSAGE, chat_data)
+    
+    def handle_undo(self, client_socket, player):
+        """Handle undo move request"""
+        if not player or not player.room_id:
+            send_message(client_socket, MSG_ERROR, {"error": "Not in a game"})
+            return
+        
+        room = self.game_manager.get_room(player.room_id)
+        if not room or not room.game:
+            send_message(client_socket, MSG_ERROR, {"error": "Game not found"})
+            return
+        
+        # Perform undo
+        if room.game.undo_move():
+            # Broadcast updated state to both players
+            move_data = {
+                "board_state": room.game.get_board_state(),
+                "current_turn": room.game.get_current_turn(),
+                "captured_by_white": room.game.captured_by_white,
+                "captured_by_black": room.game.captured_by_black,
+                "can_undo": room.game.can_undo(),
+                "can_redo": room.game.can_redo()
+            }
+            send_message(room.white_player.socket, MSG_MOVE_UPDATE, move_data)
+            send_message(room.black_player.socket, MSG_MOVE_UPDATE, move_data)
+        else:
+            send_message(client_socket, MSG_ERROR, {"error": "Cannot undo"})
+    
+    def handle_redo(self, client_socket, player):
+        """Handle redo move request"""
+        if not player or not player.room_id:
+            send_message(client_socket, MSG_ERROR, {"error": "Not in a game"})
+            return
+        
+        room = self.game_manager.get_room(player.room_id)
+        if not room or not room.game:
+            send_message(client_socket, MSG_ERROR, {"error": "Game not found"})
+            return
+        
+        # Perform redo
+        if room.game.redo_move():
+            # Broadcast updated state to both players
+            move_data = {
+                "board_state": room.game.get_board_state(),
+                "current_turn": room.game.get_current_turn(),
+                "captured_by_white": room.game.captured_by_white,
+                "captured_by_black": room.game.captured_by_black,
+                "can_undo": room.game.can_undo(),
+                "can_redo": room.game.can_redo()
+            }
+            send_message(room.white_player.socket, MSG_MOVE_UPDATE, move_data)
+            send_message(room.black_player.socket, MSG_MOVE_UPDATE, move_data)
+        else:
+            send_message(client_socket, MSG_ERROR, {"error": "Cannot redo"})
     
     def handle_resign(self, player):
         """Handle resign request"""

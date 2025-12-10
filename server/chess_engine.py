@@ -16,6 +16,8 @@ class ChessEngine:
         self.move_history = []
         self.captured_by_white = []  # Pieces captured by white
         self.captured_by_black = []  # Pieces captured by black
+        self.undo_stack = []  # Stack of (move, captured_piece, white_caps, black_caps)
+        self.redo_stack = []  # Stack for redo operations
         
     def reset(self):
         """Reset board to starting position"""
@@ -23,6 +25,8 @@ class ChessEngine:
         self.move_history = []
         self.captured_by_white = []
         self.captured_by_black = []
+        self.undo_stack = []
+        self.redo_stack = []
         
     def make_move(self, from_square: str, to_square: str, promotion: str = None) -> bool:
         """
@@ -63,11 +67,24 @@ class ChessEngine:
                     if piece_at_dest:
                         # Convert to FEN notation
                         captured_piece = piece_at_dest.symbol()
-                        # Add to appropriate capture list
+                        # Add to appropriate capture list BEFORE pushing move
+                        # self.board.turn is the player making THIS move
                         if self.board.turn == chess.WHITE:
+                            # White is capturing a black piece
                             self.captured_by_white.append(captured_piece)
                         else:
+                            # Black is capturing a white piece
                             self.captured_by_black.append(captured_piece)
+                
+                # Save state for undo (before pushing move)
+                self.undo_stack.append((
+                    move,
+                    captured_piece,
+                    self.captured_by_white.copy(),
+                    self.captured_by_black.copy()
+                ))
+                # Clear redo stack when new move is made
+                self.redo_stack = []
                 
                 self.board.push(move)
                 self.move_history.append(move)
@@ -86,6 +103,66 @@ class ChessEngine:
             return move in self.board.legal_moves
         except ValueError:
             return False
+    
+    def undo_move(self) -> bool:
+        """Undo the last move"""
+        if not self.undo_stack:
+            return False
+        
+        # Pop last move and state
+        move, captured_piece, white_caps, black_caps = self.undo_stack.pop()
+        
+        # Save to redo stack
+        self.redo_stack.append((
+            move,
+            captured_piece,
+            self.captured_by_white.copy(),
+            self.captured_by_black.copy()
+        ))
+        
+        # Undo the move
+        self.board.pop()
+        self.move_history.pop()
+        
+        # Restore capture lists
+        self.captured_by_white = white_caps
+        self.captured_by_black = black_caps
+        
+        return True
+    
+    def redo_move(self) -> bool:
+        """Redo the last undone move"""
+        if not self.redo_stack:
+            return False
+        
+        # Pop from redo stack
+        move, captured_piece, white_caps, black_caps = self.redo_stack.pop()
+        
+        # Save current state to undo stack
+        self.undo_stack.append((
+            move,
+            captured_piece,
+            self.captured_by_white.copy(),
+            self.captured_by_black.copy()
+        ))
+        
+        # Redo the move
+        self.board.push(move)
+        self.move_history.append(move)
+        
+        # Restore capture lists from redo
+        self.captured_by_white = white_caps
+        self.captured_by_black = black_caps
+        
+        return True
+    
+    def can_undo(self) -> bool:
+        """Check if undo is available"""
+        return len(self.undo_stack) > 0
+    
+    def can_redo(self) -> bool:
+        """Check if redo is available"""
+        return len(self.redo_stack) > 0
     
     def get_legal_moves(self, square: str) -> List[str]:
         """Get all legal moves for a piece at given square"""
