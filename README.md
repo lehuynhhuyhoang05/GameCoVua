@@ -39,38 +39,79 @@ Game cờ vua trực tuyến sử dụng Python Socket Programming với giao di
 - 💾 **State Synchronization** - Đồng bộ trạng thái game
 - 🛡️ **Error Handling** - Xử lý lỗi toàn diện
 
+### 🆕 NEW - Enhanced Features
+- 🔊 **Sound Effects** - Âm thanh cho mọi hành động
+- 🎨 **10 Board Themes** - Classic, Dark, Neon, Wood...
+- ⌨️ **Keyboard Shortcuts** - Điều khiển nhanh bằng phím tắt
+- 🔔 **Desktop Notifications** - Thông báo desktop
+- 🎬 **Smooth Animations** - Hiệu ứng di chuyển mượt mà
+- 🤖 **AI Opponent** - Chơi với máy (3 độ khó)
+- 💾 **Save/Load Games** - Lưu và load ván cờ (PGN format)
+- 📦 **EXE Build** - Tạo file .exe chạy độc lập
+
 ## 📋 Yêu Cầu Hệ Thống
 
-- **Python**: 3.9 trở lên
+### Development Mode:
+- **Python**: 3.8 trở lên
 - **OS**: Windows, macOS, Linux
 - **RAM**: 512MB trở lên
 - **Network**: Kết nối mạng LAN/Internet
 
+### EXE Mode (No Python needed!):
+- **OS**: Windows 7/8/10/11
+- **RAM**: 256MB trở lên
+- **Network**: Kết nối mạng LAN/Internet
+
 ## 🔧 Cài Đặt
 
-### 1. Clone Repository
+### Option A: Development (với Python)
+
+#### 1. Clone Repository
 
 ```bash
 git clone https://github.com/lehuynhhuyhoang05/GameCoVua.git
 cd GameCoVua
 ```
 
-### 2. Cài Đặt Dependencies
+#### 2. Cài Đặt Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Hoặc cài đặt thủ công:
+Packages được cài:
+- `python-chess` - Chess engine
+- `pygame` - Sound effects  
+- `numpy` - AI & audio
+- `plyer` - Desktop notifications
+- `pyinstaller` - Build EXE
+
+### Option B: EXE Mode (KHÔNG CẦN Python!)
+
+#### 1. Build EXE
+
 ```bash
-pip install python-chess
+# Quick build
+quick_build.bat
+
+# Or manual
+python build.py
+```
+
+#### 2. Output
+
+```
+dist/ChessOnline_Portable/
+├── ChessOnline.exe      ⭐ Chạy ngay không cần Python!
+├── Run_Server.bat       🖥️ Server launcher
+└── HOW_TO_RUN.txt      📝 Instructions
 ```
 
 ## 🎮 Cách Chạy
 
-### Bước 1: Khởi động Server 🖥️
+### 🅰️ Development Mode
 
-Mở terminal/cmd và chạy:
+#### Bước 1: Khởi động Server 🖥️
 
 ```bash
 python server/main.py
@@ -82,12 +123,25 @@ Output:
 📡 Waiting for connections...
 ```
 
-### Bước 2: Chạy Client Enhanced 🎮
-
-#### **Phiên bản Enhanced (Recommended) ⭐**
+#### Bước 2: Chạy Client Enhanced 🎮
 
 ```bash
 python client/main_enhanced.py
+```
+
+### 🅱️ EXE Mode (Portable)
+
+#### Bước 1: Start Server
+
+```bash
+cd dist/ChessOnline_Portable
+Double-click: Run_Server.bat
+```
+
+#### Bước 2: Start Client
+
+```bash
+Double-click: ChessOnline.exe
 ```
 
 **Tính năng:**

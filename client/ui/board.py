@@ -43,6 +43,14 @@ class ChessBoardUI:
         self.square_size = size // 8
         self.flipped = flipped
         
+        # Theme colors (can be changed dynamically)
+        self.light_square_color = LIGHT_SQUARE
+        self.dark_square_color = DARK_SQUARE
+        self.highlight_color = HIGHLIGHT_COLOR
+        self.selected_color = SELECTED_COLOR
+        self.last_move_color = LAST_MOVE_COLOR
+        self.check_color = CHECK_COLOR
+        
         # Create frame with shadow effect
         board_frame = tk.Frame(parent, bg=COLORS['shadow_md'], padx=2, pady=2)
         board_frame.pack()
@@ -91,24 +99,24 @@ class ChessBoardUI:
                 
                 # Determine square color
                 is_light = (row + col) % 2 == 0
-                color = LIGHT_SQUARE if is_light else DARK_SQUARE
+                color = self.light_square_color if is_light else self.dark_square_color
                 
                 # Apply effects based on state
                 # Priority: Check > Selected > Last Move > Legal Move > Hover
                 if (row, col) == self.check_square:
-                    color = CHECK_COLOR
+                    color = self.check_color
                 elif (row, col) == self.selected_square:
-                    color = SELECTED_COLOR
+                    color = self.selected_color
                 elif self.last_move and ((row, col) == self.last_move[0] or (row, col) == self.last_move[1]):
-                    color = LAST_MOVE_COLOR
+                    color = self.last_move_color
                 elif (row, col) in self.highlighted_squares:
-                    color = HIGHLIGHT_COLOR
+                    color = self.highlight_color
                 elif (row, col) == self.hover_square and not self.selected_square:
-                    # Slight hover effect
+                    # Slight hover effect - blend with base color
                     if is_light:
-                        color = '#F5F5DC'  # Slightly darker light square
+                        color = self._lighten_color(self.light_square_color, 0.1)
                     else:
-                        color = '#6B8E4B'  # Slightly lighter dark square
+                        color = self._lighten_color(self.dark_square_color, 0.15)
                 
                 # Draw square
                 self.canvas.create_rectangle(
@@ -355,6 +363,38 @@ class ChessBoardUI:
             row = 8 - int(rank)
         
         return (row, col)
+    
+    def _lighten_color(self, color: str, factor: float) -> str:
+        """
+        Lighten a hex color by a factor (0.0 to 1.0)
+        
+        Args:
+            color: Hex color string like '#RRGGBB'
+            factor: How much to lighten (0.1 = 10% lighter)
+        
+        Returns:
+            Lightened hex color string
+        """
+        # Remove '#' if present
+        color = color.lstrip('#')
+        
+        # Convert to RGB
+        try:
+            r, g, b = int(color[0:2], 16), int(color[2:4], 16), int(color[4:6], 16)
+        except:
+            return color  # Return original if parsing fails
+        
+        # Lighten by moving towards white (255)
+        r = int(r + (255 - r) * factor)
+        g = int(g + (255 - g) * factor)
+        b = int(b + (255 - b) * factor)
+        
+        # Clamp to 0-255
+        r = max(0, min(255, r))
+        g = max(0, min(255, g))
+        b = max(0, min(255, b))
+        
+        return f'#{r:02x}{g:02x}{b:02x}'
     
     def flip_board(self):
         """Flip board perspective"""

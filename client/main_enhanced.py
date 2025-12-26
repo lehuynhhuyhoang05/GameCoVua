@@ -16,6 +16,35 @@ from client.ui.styles import COLORS, FONTS, get_button_style
 from client.ui.components import ChessTimer, MoveHistory, PlayerInfo, CapturedPieces
 from client.ui.dialogs import PawnPromotionDialog, ConfirmDialog, GameOverDialog
 
+# New features
+try:
+    from client.audio.sounds import get_sound_manager
+    SOUND_AVAILABLE = True
+except:
+    SOUND_AVAILABLE = False
+    print("⚠️ Sound system not available")
+
+try:
+    from client.ui.themes import get_theme_manager
+    THEMES_AVAILABLE = True
+except:
+    THEMES_AVAILABLE = False
+    print("⚠️ Themes not available")
+
+try:
+    from client.ui.notifications import get_notification_manager
+    NOTIFICATIONS_AVAILABLE = True
+except:
+    NOTIFICATIONS_AVAILABLE = False
+    print("⚠️ Notifications not available")
+
+try:
+    from client.ui.animations import Animator
+    ANIMATIONS_AVAILABLE = True
+except:
+    ANIMATIONS_AVAILABLE = False
+    print("⚠️ Animations not available")
+
 
 class ChessClientEnhanced:
     """Enhanced Chess Client with beautiful UI"""
@@ -53,6 +82,19 @@ class ChessClientEnhanced:
         self.status_label = None
         self.chat_text = None
         self.chat_entry = None
+        self.undo_btn = None
+        self.redo_btn = None
+        
+        # New features
+        self.sound_manager = get_sound_manager() if SOUND_AVAILABLE else None
+        self.theme_manager = get_theme_manager() if THEMES_AVAILABLE else None
+        self.notification_manager = get_notification_manager() if NOTIFICATIONS_AVAILABLE else None
+        self.animator = None
+        self.current_theme = 'classic'
+        self.sound_enabled = True
+        
+        # Bind window close event
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
         self.setup_login_screen()
     
@@ -614,6 +656,106 @@ class ChessClientEnhanced:
             **get_button_style('dark'),
             width=12
         ).pack(fill=tk.X, pady=3)
+        
+        # Settings section
+        tk.Label(
+            right_sidebar,
+            text="⚙️ Settings",
+            font=FONTS['subheading'],
+            bg=COLORS['bg_primary'],
+            fg=COLORS['text_dark']
+        ).pack(anchor='w', pady=(15, 10))
+        
+        settings_frame = tk.Frame(right_sidebar, bg=COLORS['bg_primary'])
+        settings_frame.pack(fill=tk.X)
+        
+        # Theme selector
+        if THEMES_AVAILABLE and self.theme_manager:
+            theme_selector_frame = tk.Frame(settings_frame, bg=COLORS['bg_primary'])
+            theme_selector_frame.pack(fill=tk.X, pady=3)
+            
+            tk.Label(
+                theme_selector_frame,
+                text="🎨 Theme:",
+                font=FONTS['small'],
+                bg=COLORS['bg_primary'],
+                fg=COLORS['text_dark']
+            ).pack(side=tk.LEFT, padx=(0, 5))
+            
+            self.theme_var = tk.StringVar(value=self.current_theme)
+            theme_dropdown = ttk.Combobox(
+                theme_selector_frame,
+                textvariable=self.theme_var,
+                values=self.theme_manager.get_theme_names(),
+                state='readonly',
+                width=12,
+                font=FONTS['small']
+            )
+            theme_dropdown.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            theme_dropdown.bind('<<ComboboxSelected>>', self.on_theme_change)
+        
+        # Sound toggle
+        if SOUND_AVAILABLE and self.sound_manager:
+            self.sound_btn = tk.Button(
+                settings_frame,
+                text=f"🔊 Sound: {'ON' if self.sound_enabled else 'OFF'}",
+                command=self.toggle_sound,
+                **get_button_style('secondary'),
+                width=12
+            )
+            self.sound_btn.pack(fill=tk.X, pady=3)
+        
+        # Keyboard shortcuts help
+        tk.Button(
+            settings_frame,
+            text="⌨️ Shortcuts (Ctrl+H)",
+            command=self.show_shortcuts,
+            **get_button_style('secondary'),
+            width=12
+        ).pack(fill=tk.X, pady=3)
+        
+        # Initialize animator
+        if ANIMATIONS_AVAILABLE:
+            self.animator = Animator(self.root)
+        
+        # Bind keyboard shortcuts
+        self.root.bind('<Escape>', lambda e: self.on_escape())
+        self.root.bind('<Control-t>', lambda e: self.cycle_theme())
+        self.root.bind('<Control-m>', lambda e: self.toggle_sound())
+        self.root.bind('<Control-h>', lambda e: self.show_shortcuts())
+        self.root.bind('<Control-s>', lambda e: self.offer_draw())
+        self.root.bind('<Control-x>', lambda e: self.resign())
+        self.root.bind('<Control-q>', lambda e: self.leave_game())
+        self.root.bind('<Control-slash>', lambda e: self.focus_chat())
+    
+    def on_escape(self):
+        """Handle ESC key"""
+        if self.selected_square:
+            self.selected_square = None
+            self.legal_moves = []
+            if self.board_ui:
+                self.board_ui.clear_selection()
+    
+    def cycle_theme(self):
+        """Cycle to next theme"""
+        if not THEMES_AVAILABLE or not self.theme_manager:
+            return
+        
+        if not hasattr(self, 'theme_var'):
+            return
+        
+        themes = self.theme_manager.get_theme_names()
+        current_idx = themes.index(self.current_theme)
+        next_idx = (current_idx + 1) % len(themes)
+        next_theme = themes[next_idx]
+        
+        self.theme_var.set(next_theme)
+        self.on_theme_change()
+    
+    def focus_chat(self):
+        """Focus on chat input"""
+        if self.chat_entry:
+            self.chat_entry.focus()
     
     def on_square_click(self, row: int, col: int):
         """Handle square click on chess board"""
@@ -719,10 +861,97 @@ class ChessClientEnhanced:
             self.add_chat_message("System", "Press ESC to exit fullscreen", is_system=True)
     
     def leave_game(self):
-        """Leave current game"""
-        if messagebox.askyesno("Leave Game", "Are you sure you want to leave?"):
+        """Leave current game with confirmation"""
+        dialog = ConfirmDialog(
+            self.root,
+            "Leave Game",
+            "Are you sure you want to leave this game?",
+            "warning"
+        )
+        if dialog.show():
             self.network.send(MSG_LEAVE_ROOM, {})
             self.setup_lobby_screen()
+    
+    def on_closing(self):
+        """Handle window close event with confirmation"""
+        dialog = ConfirmDialog(
+            self.root,
+            "Exit Chess Online",
+            "Are you sure you want to exit?\\nAny ongoing game will be abandoned.",
+            "warning"
+        )
+        if dialog.show():
+            if self.network:
+                self.network.disconnect()
+            self.root.destroy()
+    
+    def on_theme_change(self, event=None):
+        """Handle theme change"""
+        if not THEMES_AVAILABLE or not self.theme_manager:
+            return
+        
+        new_theme = self.theme_var.get()
+        self.theme_manager.set_theme(new_theme)
+        self.current_theme = new_theme
+        
+        # Apply theme to board
+        if self.board_ui:
+            theme = self.theme_manager.get_current_theme()
+            self.board_ui.light_square_color = theme.light_square
+            self.board_ui.dark_square_color = theme.dark_square
+            self.board_ui.highlight_color = theme.highlight
+            self.board_ui.selected_color = theme.selected
+            self.board_ui.last_move_color = theme.last_move
+            self.board_ui.check_color = theme.check
+            self.board_ui.draw_board()
+            self.board_ui.draw_pieces()  # Redraw pieces after board
+        
+        # Play sound
+        if self.sound_manager and self.sound_enabled:
+            self.sound_manager.play('move')
+        
+        self.add_chat_message("System", f"Theme changed to {new_theme}", is_system=True)
+    
+    def toggle_sound(self):
+        """Toggle sound on/off"""
+        if not SOUND_AVAILABLE or not self.sound_manager:
+            return
+        
+        self.sound_enabled = self.sound_manager.toggle_sound()
+        status = "ON" if self.sound_enabled else "OFF"
+        
+        # Update sound button if it exists
+        if hasattr(self, 'sound_btn'):
+            self.sound_btn.config(text=f"🔊 Sound: {status}")
+        
+        self.add_chat_message("System", f"🔊 Sound: {status}", is_system=True)
+    
+    def show_shortcuts(self):
+        """Show keyboard shortcuts help"""
+        shortcuts_text = """
+⌨️ KEYBOARD SHORTCUTS
+
+═══ Game Controls ═══
+  Esc                → Deselect piece
+  Ctrl+Z             → Undo move
+  Ctrl+Y             → Redo move
+  
+═══ UI Controls ═══
+  Ctrl+T             → Change theme
+  Ctrl+M             → Toggle sound
+  Ctrl+H             → Show this help
+  F11                → Toggle fullscreen
+  
+═══ Chat ═══
+  Enter              → Send message
+  Ctrl+/             → Focus chat
+  
+═══ Game Actions ═══
+  Ctrl+S             → Offer draw
+  Ctrl+X             → Resign
+  Ctrl+Q             → Leave game
+"""
+        messagebox.showinfo("Keyboard Shortcuts", shortcuts_text)
     
     def undo_move(self):
         """Request undo last move"""
@@ -775,6 +1004,23 @@ class ChessClientEnhanced:
                 bg=COLORS['success'],
                 fg=COLORS['text_light']
             )
+            
+            # Play game start sound
+            if self.sound_manager and self.sound_enabled:
+                self.sound_manager.play('game_start')
+            
+            # Send notification
+            if self.notification_manager:
+                self.notification_manager.notify_game_start(self.opponent_name)
+            
+            # Update undo/redo button states
+            can_undo = data.get("can_undo", False)
+            can_redo = data.get("can_redo", False)
+            if self.undo_btn:
+                self.undo_btn.config(state=tk.NORMAL if can_undo else tk.DISABLED)
+            if self.redo_btn:
+                self.redo_btn.config(state=tk.NORMAL if can_redo else tk.DISABLED)
+            
             # Start timers
             if self.my_color == COLOR_WHITE:
                 self.my_timer.start()
@@ -794,8 +1040,21 @@ class ChessClientEnhanced:
             to_sq = data.get("to")
             captured_piece = data.get("captured_piece")
             
-            self.update_board(data.get("board_state"))
+            # Play sound for move
+            if self.sound_manager and self.sound_enabled:
+                if captured_piece:
+                    self.sound_manager.play('capture')
+                else:
+                    self.sound_manager.play('move')
+            
+            # Check if it's my turn now (notify)
+            prev_turn = self.current_turn
             self.current_turn = data.get("current_turn")
+            
+            if self.notification_manager and self.current_turn == self.my_color and prev_turn != self.my_color:
+                self.notification_manager.notify_your_turn()
+            
+            self.update_board(data.get("board_state"))
             
             # Update last move highlight
             if from_sq and to_sq:
@@ -807,6 +1066,10 @@ class ChessClientEnhanced:
             if self.my_captured and self.opponent_captured:
                 captured_by_white = data.get("captured_by_white", [])  # Black pieces white captured
                 captured_by_black = data.get("captured_by_black", [])  # White pieces black captured
+                
+                print(f"[CAPTURED DEBUG] My color: {self.my_color}")
+                print(f"[CAPTURED DEBUG] captured_by_white: {captured_by_white}")
+                print(f"[CAPTURED DEBUG] captured_by_black: {captured_by_black}")
                 
                 if self.my_color == COLOR_WHITE:
                     # I am WHITE:
@@ -850,6 +1113,15 @@ class ChessClientEnhanced:
         elif msg_type == MSG_GAME_OVER:
             result = data.get("result")
             reason = data.get("reason")
+            
+            # Play game end sound
+            if self.sound_manager and self.sound_enabled:
+                self.sound_manager.play('game_end')
+            
+            # Send notification
+            if self.notification_manager:
+                self.notification_manager.notify_game_over(f"{result} - {reason}")
+            
             self.show_game_over(result, reason)
             # Stop timers
             if self.my_timer:

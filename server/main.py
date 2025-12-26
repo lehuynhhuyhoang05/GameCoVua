@@ -208,7 +208,9 @@ class ChessServer:
             "game_id": room.room_id,
             "white_player": room.white_player.username,
             "black_player": room.black_player.username,
-            "board_state": room.game.get_board_state()
+            "board_state": room.game.get_board_state(),
+            "can_undo": room.game.can_undo(),
+            "can_redo": room.game.can_redo()
         }
         
         # Send to white player
